@@ -1,4 +1,5 @@
-﻿using System;
+﻿using FileDownloader;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Data;
@@ -18,19 +19,19 @@ namespace MyDownloaderGUI
         List<string> listfile2 = new List<string>();
         List<string> listfile3 = new List<string>();
 
-        int curIndex1 = 0;
+        int curIndex1 = -1;
         string dfile1 = "";
 
-        int curIndex2 = 0;
+        int curIndex2 = -1;
         string dfile2 = "";
 
-        int curIndex3 = 0;
+        int curIndex3 = -1;
         string dfile3 = "";
 
-        WebClient wc1 = new WebClient();
-        WebClient wc2 = new WebClient();
-        WebClient wc3 = new WebClient();
-
+        IFileDownloader  fd1 = new FileDownloader.FileDownloader(new DownloadCache());
+        IFileDownloader fd2 = new FileDownloader.FileDownloader(new DownloadCache());
+        IFileDownloader fd3 = new FileDownloader.FileDownloader(new DownloadCache());
+        
         string downloadPath = "";
         string MovieName = "";
         string DownloadLink = "";
@@ -39,14 +40,106 @@ namespace MyDownloaderGUI
         {
             InitializeComponent();
 
-            wc1.DownloadProgressChanged += Wc1_DownloadProgressChanged;
-            wc2.DownloadProgressChanged += Wc2_DownloadProgressChanged;
-            wc3.DownloadProgressChanged += Wc3_DownloadProgressChanged;
+            fd1.DownloadProgressChanged += Fd_DownloadProgressChanged; 
+            fd2.DownloadProgressChanged += Fd_DownloadProgressChanged;
+            fd3.DownloadProgressChanged += Fd_DownloadProgressChanged;
 
-            wc1.DownloadFileCompleted += Wc1_DownloadFileCompleted;
-            wc2.DownloadFileCompleted += Wc2_DownloadFileCompleted;
-            wc3.DownloadFileCompleted += Wc3_DownloadFileCompleted;
-            
+            fd1.DownloadFileCompleted += Fd_DownloadFileCompleted; 
+            fd2.DownloadFileCompleted += Fd_DownloadFileCompleted;
+            fd3.DownloadFileCompleted += Fd_DownloadFileCompleted;
+
+            fd1.Tag = 1;
+            fd2.Tag = 2;
+            fd3.Tag = 3;
+        }
+
+        private void Fd_DownloadProgressChanged(object sender, DownloadFileProgressChangedArgs e)
+        {
+            var fd = (IFileDownloader)sender;
+
+            if (fd.Tag == 1)
+            {
+                progressBar1.Value = e.ProgressPercentage;
+            }
+            else if (fd.Tag == 2)
+            {
+                progressBar2.Value = e.ProgressPercentage;
+            }
+            else if (fd.Tag == 3)
+            {
+                progressBar3.Value = e.ProgressPercentage;
+            }
+        }
+
+        private void Fd_DownloadFileCompleted(object sender, DownloadFileCompletedArgs e)
+        {
+            var fd = (IFileDownloader)sender;
+
+            if (fd.Tag == 1)
+            {
+                if (e.State == CompletedState.Succeeded)
+                {
+                    listStat.Items.Add("Done - " + dfile1);
+                }
+                else if (e.State == CompletedState.Failed)
+                {
+                    listStat.Items.Add("Download failed for -- " + dfile1 + ". Retrying...");
+                    curIndex1--;
+                }
+
+                var rtn = false;
+
+                while (!rtn)
+                {
+                    rtn = StartDownload(ref dfile1, listfile1, 1, ref curIndex1, fd1);
+                }
+            }
+            else if(fd.Tag == 2)
+            {
+                if (e.Error == null)
+                {
+                    listStat.Items.Add("Done - " + dfile2);
+                    listStat.TopIndex = listStat.Items.Count - 1;
+                }
+                else
+                {
+                    listStat.Items.Add("Download failed for -- " + dfile2 + ". Retrying...");
+                    curIndex2--;
+                }
+
+                var rtn = false;
+
+                while (!rtn)
+                {
+                    rtn = StartDownload(ref dfile2, listfile2, 2, ref curIndex2, fd2);
+                }
+            }
+            else if (fd.Tag == 3)
+            {
+                if (e.Error == null)
+                {
+                    listStat.Items.Add("Done - " + dfile3);
+                    listStat.TopIndex = listStat.Items.Count - 1;
+                }
+                else
+                {
+                    listStat.Items.Add("Download failed for -- " + dfile3 + ". Retrying...");
+                    listStat.TopIndex = listStat.Items.Count - 1;
+
+                    listfile3.Add(listfile3[curIndex3]);
+                    if (File.Exists(Path.Combine(downloadPath, dfile3)))
+                    {
+                        File.Delete(Path.Combine(downloadPath, dfile3));
+                    }
+                }
+
+                var rtn = false;
+
+                while (!rtn)
+                {
+                    rtn = StartDownload(ref dfile3, listfile3, 3, ref curIndex3, fd3);
+                }
+            }
         }
 
         private void btnDownload_Click(object sender, EventArgs e)
@@ -90,7 +183,7 @@ namespace MyDownloaderGUI
             Cursor = Cursors.Arrow;
         }
 
-        private bool done(ref string dfile, List<string> curList, int listNum, ref int curIndex, WebClient curWebClient)
+        private bool StartDownload(ref string dfile, List<string> curList, int listNum, ref int curIndex, IFileDownloader curFD)
         {
             curIndex++;
 
@@ -104,7 +197,7 @@ namespace MyDownloaderGUI
                 dfile = curfilename.Split('/').Last();
                 if (!File.Exists(Path.Combine(downloadPath, dfile)))
                 {
-                    curWebClient.DownloadFileAsync(new Uri(curfilename), Path.Combine(downloadPath, dfile));
+                    curFD.DownloadFileAsync(new Uri(curfilename), Path.Combine(downloadPath, dfile));
                     listStat.Items.Add($"Downloading file {curIndex + 1} out of {curList.Count}");
                 }
                 else
@@ -118,103 +211,19 @@ namespace MyDownloaderGUI
             listStat.TopIndex = listStat.Items.Count - 1;
             return true;
         }
-        private void Wc1_DownloadFileCompleted(object sender, AsyncCompletedEventArgs e)
-        {
-            if (e.Error == null)
-            {
-                listStat.Items.Add("Done - " + dfile1);
-            }
-            else
-            {
-                listStat.Items.Add("Download failed for -- " + dfile1 + ". Will try again later.");
-                listfile1.Add(listfile1[curIndex1]);
-                if (File.Exists(Path.Combine(downloadPath, dfile1)))
-                {
-                    File.Delete(Path.Combine(downloadPath, dfile1));
-                }
-            }
-
-            var rtn = false;
-
-            while (!rtn)
-            {
-                rtn = done(ref dfile1, listfile1, 1, ref curIndex1, wc1);
-            }
-        }
-
-        private void Wc2_DownloadFileCompleted(object sender, AsyncCompletedEventArgs e)
-        {
-            if (e.Error == null)
-            {
-                listStat.Items.Add("Done - " + dfile2);
-                listStat.TopIndex = listStat.Items.Count - 1;
-            }
-            else
-            {
-                listStat.Items.Add("Download failed for -- " + dfile2 + ". Will try again later.");
-                listStat.TopIndex = listStat.Items.Count - 1;
-                listfile2.Add(listfile2[curIndex2]);
-                if (File.Exists(Path.Combine(downloadPath, dfile2)))
-                {
-                    File.Delete(Path.Combine(downloadPath, dfile2));
-                }
-            }
-
-            var rtn = false;
-
-            while (!rtn)
-            {
-                rtn = done(ref dfile2, listfile2, 2, ref curIndex2, wc2);
-            }
-        }
-
-        private void Wc3_DownloadFileCompleted(object sender, AsyncCompletedEventArgs e)
-        {
-            if (e.Error == null)
-            {
-                listStat.Items.Add("Done - " + dfile3);
-                listStat.TopIndex = listStat.Items.Count - 1;
-            }
-            else
-            {
-                listStat.Items.Add("Download failed for -- " + dfile3 + ". Will try again later.");
-                listStat.TopIndex = listStat.Items.Count - 1;
-
-                listfile3.Add(listfile3[curIndex3]);
-                if (File.Exists(Path.Combine(downloadPath, dfile3)))
-                {
-                    File.Delete(Path.Combine(downloadPath, dfile3));
-                }
-            }
-
-            var rtn = false;
-
-            while (!rtn)
-            {
-                rtn = done(ref dfile3, listfile3, 3, ref curIndex3, wc3);
-            }
-        }
         
-        private void Wc1_DownloadProgressChanged(object sender, DownloadProgressChangedEventArgs e)
-        {
-            progressBar1.Value = e.ProgressPercentage;
-        }
-
-        private void Wc2_DownloadProgressChanged(object sender, DownloadProgressChangedEventArgs e)
-        {
-            progressBar2.Value = e.ProgressPercentage;
-        }
-
-        private void Wc3_DownloadProgressChanged(object sender, DownloadProgressChangedEventArgs e)
-        {
-            progressBar3.Value = e.ProgressPercentage;
-        }
-
         private void btnDownload_Click_1(object sender, EventArgs e)
         {
             if (chkFileList.Items.Count < 1)
             {
                 MessageBox.Show("No file in the download list. Click fetch to get the Fies you want to download.");
+                return;
+            }
+
+            if (fd1.isBusy || fd2.isBusy || fd3.isBusy)
+            {
+                MessageBox.Show("Download is ongoing, Please wait until its done.");
+                return;
             }
 
             var listfiles = new List<string>();
@@ -246,28 +255,24 @@ namespace MyDownloaderGUI
             listStat.Items.Add("Starting Download...");
             listStat.TopIndex = listStat.Items.Count - 1;
 
+            var curfilename = listfile1[curIndex1];
+
             if (listfile1.Count < 0)
             {
                 listStat.Items.Add("No file in list 1...");
                 listStat.TopIndex = listStat.Items.Count - 1;
             }
-
-            var curfilename = listfile1[curIndex1];
-            dfile1 = curfilename.Split('/').Last();
-            if (!File.Exists(Path.Combine(downloadPath, dfile1)))
-            {
-                wc1.DownloadFileAsync(new Uri(curfilename), Path.Combine(downloadPath, dfile1));
-                listStat.Items.Add($"Downloading file {curIndex1 + 1} out of {listfile1.Count}");
-                listStat.TopIndex = listStat.Items.Count - 1;
-            }
             else
             {
+                dfile1 = Uri.UnescapeDataString(curfilename).Split('/').Last();
+                
                 var rtn = false;
 
                 while (!rtn)
                 {
-                    rtn = done(ref dfile1, listfile1, 1, ref curIndex1, wc1);
+                    rtn = StartDownload(ref dfile1, listfile1, 1, ref curIndex1, fd1);
                 }
+
             }
 
             if (listfile2.Count < 0)
@@ -275,22 +280,16 @@ namespace MyDownloaderGUI
                 listStat.Items.Add("No file in list 2...");
                 listStat.TopIndex = listStat.Items.Count - 1;
             }
-
-            curfilename = listfile2[curIndex2];
-            dfile2 = curfilename.Split('/').Last();
-            if (!File.Exists(Path.Combine(downloadPath, dfile2)))
-            {
-                wc2.DownloadFileAsync(new Uri(curfilename), Path.Combine(downloadPath, dfile2));
-                listStat.Items.Add($"Downloading file {curIndex2 + 1} out of {listfile2.Count}");
-                listStat.TopIndex = listStat.Items.Count - 1;
-            }
             else
             {
+                curfilename = listfile2[curIndex2];
+                dfile2 = Uri.UnescapeDataString(curfilename).Split('/').Last();
+                
                 var rtn = false;
 
                 while (!rtn)
                 {
-                    rtn = done(ref dfile2, listfile2, 2, ref curIndex2, wc2);
+                    rtn = StartDownload(ref dfile2, listfile2, 2, ref curIndex2, fd2);
                 }
             }
 
@@ -300,23 +299,19 @@ namespace MyDownloaderGUI
                 listStat.Items.Add("No file in list 3...");
                 listStat.TopIndex = listStat.Items.Count - 1;
             }
-            curfilename = listfile3[curIndex3];
-            dfile3 = curfilename.Split('/').Last();
-            if (!File.Exists(Path.Combine(downloadPath, dfile3)))
-            {
-                wc3.DownloadFileAsync(new Uri(curfilename), Path.Combine(downloadPath, dfile3));
-                listStat.Items.Add($"Downloading file {curIndex3 + 1} out of {listfile3.Count}");
-                listStat.TopIndex = listStat.Items.Count - 1;
-            }
             else
             {
+                curfilename = listfile3[curIndex3];
+                dfile3 = Uri.UnescapeDataString(curfilename).Split('/').Last();
+
                 var rtn = false;
 
                 while (!rtn)
                 {
-                    rtn = done(ref dfile3, listfile3, 3, ref curIndex3, wc3);
+                    rtn = StartDownload(ref dfile3, listfile3, 3, ref curIndex3, fd3);
                 }
             }
         }
+        
     }
 }
