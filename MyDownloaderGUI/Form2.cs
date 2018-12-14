@@ -246,6 +246,12 @@ namespace MyDownloaderGUI
             listStat.Items.Add("Starting Download...");
             listStat.TopIndex = listStat.Items.Count - 1;
 
+            if (listfile1.Count < 0)
+            {
+                listStat.Items.Add("No file in list 1...");
+                listStat.TopIndex = listStat.Items.Count - 1;
+            }
+
             var curfilename = listfile1[curIndex1];
             dfile1 = curfilename.Split('/').Last();
             if (!File.Exists(Path.Combine(downloadPath, dfile1)))
@@ -262,6 +268,12 @@ namespace MyDownloaderGUI
                 {
                     rtn = done(ref dfile1, listfile1, 1, ref curIndex1, wc1);
                 }
+            }
+
+            if (listfile2.Count < 0)
+            {
+                listStat.Items.Add("No file in list 2...");
+                listStat.TopIndex = listStat.Items.Count - 1;
             }
 
             curfilename = listfile2[curIndex2];
@@ -283,6 +295,11 @@ namespace MyDownloaderGUI
             }
 
 
+            if (listfile3.Count < 0)
+            {
+                listStat.Items.Add("No file in list 3...");
+                listStat.TopIndex = listStat.Items.Count - 1;
+            }
             curfilename = listfile3[curIndex3];
             dfile3 = curfilename.Split('/').Last();
             if (!File.Exists(Path.Combine(downloadPath, dfile3)))

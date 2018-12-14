@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.IO.IsolatedStorage;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -12,18 +13,28 @@ namespace MyDownloaderGUI
     {
         static HtmlNodeCollection GetNodes(HtmlDocument doc)
         {
-            var nodes = doc.DocumentNode.SelectNodes(@"/html/body/pre/a");
-            if (nodes == null)
+            var xPaths = new List<string>
             {
-                nodes = doc.DocumentNode.SelectNodes(@"/html/body/table/tbody/tr/td/a");
-                if(nodes == null)
+                @"/html/body/pre/a",
+                @"/html/body/table/tbody/tr/td/a",
+                @"/html/body/main/div/div[2]/div[4]/table/tbody/tr/td/a"
+            };
+
+            HtmlNodeCollection nodes = null;
+            var index = 0;
+
+            while (nodes==null)
+            {
+                if (index >= xPaths.Count)
                 {
-                    nodes = doc.DocumentNode.SelectNodes(@"/html/body/main/div/div[2]/div[4]/table/tbody/tr/td/a");
-                    return nodes;
+                    break;
                 }
-                return nodes;
+
+                nodes = doc.DocumentNode.SelectNodes(xPaths[index]);
+                index++;
             }
-            else return nodes;
+
+            return nodes;
         }
         
         public static List<string> Webscraper(string URL)
@@ -53,19 +64,13 @@ namespace MyDownloaderGUI
                     {
                         var href = node.Attributes["href"].Value;
 
-                        if (href.StartsWith(".."))
+                        bool? isfile = isFile(href);
+
+                        if (isfile == null)
                         {
 
                         }
-                        else if (href.ToLower().EndsWith(".mkv"))
-                        {
-                            downloadLinks.Add(Path.Combine(url, href));
-                        }
-                        else if (href.ToLower().EndsWith(".mp4"))
-                        {
-                            downloadLinks.Add(Path.Combine(url, href));
-                        }
-                        else if (href.ToLower().EndsWith(".zip"))
+                        else if (isfile == true)
                         {
                             downloadLinks.Add(Path.Combine(url, href));
                         }
@@ -73,7 +78,6 @@ namespace MyDownloaderGUI
                         {
                             folderLinks.Add(Path.Combine(url, href));
                         }
-
                     }
                 }
                 curIndex++;
@@ -81,6 +85,27 @@ namespace MyDownloaderGUI
 
             return downloadLinks;
 
+        }
+
+        private static bool? isFile(string href)
+        {
+            if (href.StartsWith(".."))
+            {
+                return null;
+            }
+            else
+            {
+                if (href.Contains("."))
+                {
+                    var extensionRange = href.ToLower().Substring(href.Length - 5);
+
+                    return extensionRange.Contains(".");
+                }
+                else
+                {
+                    return false;
+                }
+            }
         }
     }
 }
